@@ -5,6 +5,8 @@ import (
 	"fractals/pkg/screen"
 	"log"
 	"runtime"
+
+	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
 const Width = 800
@@ -22,8 +24,12 @@ func step(delta float64) {
 	home.Render(delta)
 }
 
-func mousePress(x, y float64) {
-	home.MousePress(x, y)
+func mousePress(action glfw.Action, x, y float64) {
+	home.MousePress(action, x, y)
+}
+
+func mouseMove(x, y float64) {
+	home.MouseMove(x, y)
 }
 
 func main() {
@@ -37,5 +43,6 @@ func main() {
 
 	window.SetRunStep(step)
 	window.SetMousePress(mousePress)
+	window.SetMouseMove(mouseMove)
 	window.Run()
 }

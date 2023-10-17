@@ -5,8 +5,10 @@ import (
 	"fractals/pkg/mandelbrot"
 	"image"
 	"image/color"
+	"log"
 
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
 type Home struct {
@@ -18,15 +20,23 @@ type Home struct {
 	width  int
 	height int
 
-	xOffset float64
-	yOffset float64
-	size    float64
+	xOffset  float64
+	yOffset  float64
+	origSize float64
+	size     float64
 
 	algo    *mandelbrot.MandelbrotGenerator
 	context *image.RGBA
 
 	recalcuate bool
+
+	mousePressing bool
+	mouseStartX   float64
+	mouseStartY   float64
 }
+
+var Percision = uint64(5000)
+var MovePercision = uint64(1000)
 
 func (h *Home) Initialize(width, height int) {
 	h.width = width
@@ -51,43 +61,88 @@ func (h *Home) Initialize(width, height int) {
 		gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
 	}
 
-	h.algo = mandelbrot.NewGenerator(h.width, h.height, 100, 2.)
+	h.algo = mandelbrot.NewGenerator(h.width, h.height, Percision, 2.0)
+	// h.algo = mandelbrot.NewJuliaGenerator(h.width, h.height, Percision, 2.0)
 	h.context = image.NewRGBA(image.Rect(0, 0, h.width, h.height))
 
-	h.xOffset = -0.5
+	h.xOffset = -0.55
 	h.yOffset = 0.0
 	h.size = 2.0
+
+	// h.xOffset = -0.19307385078394196
+	// h.yOffset = 0.6484541110445733
+	// h.size = 2.183869274407153e-08
+	h.xOffset = -0.1930738568025074
+	h.yOffset = 0.6484541050911828
+	h.size = 4.046753855289677e-09
+
+	// h.xOffset = -0.07153106897851419
+	// h.yOffset = 0.8245921334837182
+	// h.size = 0.00443706246892452
+	h.origSize = 2.
 
 	h.recalcuate = true
 }
 
-func (h *Home) MousePress(x, y float64) {
-	h.size -= 0.1
+func (h *Home) MouseMove(x, y float64) {
+	if !h.mousePressing {
+		return
+	}
 
-	// coord = mv + ( 4*value/win_size - 2 )/zoom_factor
-	// cooord.x = mv.x + (4.0 value / win_size.width - 2) / zoom
-	// cooord.y = mv.y + (4.0 value / win_size.height - 2) / zoom
+	scaleFactor := h.origSize / h.size
 
-	// coordX := x + (4.0*h.xOffset/float64(h.width)-2.)/h.size
-	// coordY := y + (4.0*h.yOffset/float64(h.height)-2.)/h.size
-	// log.Println("X:", coordX, "Y:", coordY)
-
-	// coordsX := x - (float64(h.width) / 2.0)
-	// coordsY := y - (float64(h.height) / 2.0)
-
-	// log.Println("CoordsX:", coordsX, "CoordsY:", coordsY)
+	diffX := ((x - h.mouseStartX) / (250. * scaleFactor))
+	diffY := ((y - h.mouseStartY) / (250. * scaleFactor))
+	h.xOffset -= diffX
+	h.yOffset += diffY
 
 	h.recalcuate = true
+	h.mouseStartX = x
+	h.mouseStartY = y
+}
+
+func (h *Home) MousePress(action glfw.Action, x, y float64) {
+	if action == glfw.Press {
+		h.mousePressing = true
+		h.mouseStartX = x
+		h.mouseStartY = y
+
+		h.algo.SetMaxIteration(MovePercision)
+		h.recalcuate = true
+
+	} else if action == glfw.Release {
+		h.mousePressing = false
+
+		diffX := x - h.mouseStartX
+		diffY := y - h.mouseStartY
+		// If there was no movement, zoom in instead
+		if diffX == 0 && diffY == 0 {
+			sizeDiff := h.size / h.origSize
+			h.size -= 0.2 * sizeDiff
+			Percision += 100
+			MovePercision = Percision / 10
+
+			log.Println("Offset X:", h.xOffset, ", offset Y:", h.yOffset, ", size:", h.size)
+			log.Println("Percission:", Percision, "MovePercision", MovePercision)
+		}
+
+		h.algo.SetMaxIteration(uint64(Percision))
+		h.recalcuate = true
+	}
 }
 
 func (h *Home) Update(delta float64) {
 	if h.recalcuate {
-		for x := 0; x < h.width; x++ {
-			for y := 0; y < h.height; y++ {
-				col := h.algo.Color(h.xOffset, h.yOffset, h.size, float64(x), float64(y))
-				h.context.Set(x, y, color.RGBA{R: col.R, G: col.G, B: col.B, A: 255})
-			}
+		amount := 100
+		data := h.algo.GenerateImage(h.xOffset, h.yOffset, h.size, h.width, h.height, amount)
+
+		for index, val := range data {
+			x := index / h.width
+			y := index % h.width
+			col := color.RGBA{R: val.R, G: val.G, B: val.B, A: 255}
+			h.context.Set(x, y, col)
 		}
+
 		h.recalcuate = false
 	}
 }

@@ -18,12 +18,14 @@ type Window struct {
 
 	step       RunCallback
 	mousePress MousePressCallback
+	mouseMove  MouseMoveCallback
 
 	glfwWindow *glfw.Window
 }
 
 type RunCallback func(delta float64)
-type MousePressCallback func(x, y float64)
+type MousePressCallback func(state glfw.Action, x, y float64)
+type MouseMoveCallback func(x, y float64)
 
 func NewWindow(width, height int, title string) (*Window, error) {
 	w := Window{}
@@ -40,14 +42,16 @@ func NewWindow(width, height int, title string) (*Window, error) {
 }
 
 func (w *Window) cursorPress(glfwWindow *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
-
-	if action == glfw.Release {
-		return
-	}
-
 	x, y := glfwWindow.GetCursorPos()
 	if w.mousePress != nil {
-		w.mousePress(x, y)
+		w.mousePress(action, x, y)
+	}
+}
+
+func (w *Window) cursorMove(glfwWindow *glfw.Window, xpos float64, ypos float64) {
+	x, y := glfwWindow.GetCursorPos()
+	if w.mouseMove != nil {
+		w.mouseMove(x, y)
 	}
 }
 
@@ -66,6 +70,7 @@ func (w *Window) setupGLFW() error {
 	}
 
 	window.SetMouseButtonCallback(w.cursorPress)
+	window.SetCursorPosCallback(w.cursorMove)
 	window.MakeContextCurrent()
 
 	if err := gl.Init(); err != nil {
@@ -84,6 +89,10 @@ func (w *Window) SetRunStep(call RunCallback) {
 
 func (w *Window) SetMousePress(call MousePressCallback) {
 	w.mousePress = call
+}
+
+func (w *Window) SetMouseMove(call MouseMoveCallback) {
+	w.mouseMove = call
 }
 
 func (w *Window) Run() {
